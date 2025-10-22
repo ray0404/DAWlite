@@ -83,13 +83,13 @@ const AudioClipUI: React.FC<AudioClipUIProps> = ({ clip, trackId, pixelsPerSecon
             <div 
                 onMouseDown={(e) => handleInteractionStart(e, 'trim-start')}
                 onTouchStart={(e) => handleInteractionStart(e, 'trim-start')}
-                className="absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize group-hover:bg-white/20 transition-colors"
+                className="absolute left-0 top-0 bottom-0 w-6 cursor-ew-resize group-hover:bg-white/20 transition-colors"
                 title="Trim start"
             ></div>
              <div 
                 onMouseDown={(e) => handleInteractionStart(e, 'trim-end')}
                 onTouchStart={(e) => handleInteractionStart(e, 'trim-end')}
-                className="absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize group-hover:bg-white/20 transition-colors"
+                className="absolute right-0 top-0 bottom-0 w-6 cursor-ew-resize group-hover:bg-white/20 transition-colors"
                 title="Trim end"
             ></div>
         </div>

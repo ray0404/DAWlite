@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 
 interface KnobProps {
@@ -20,13 +19,16 @@ const Knob: React.FC<KnobProps> = ({ value, onChange, min = 0, max = 100, step =
         return percentage * 270 - 135;
     }, [min, max]);
 
-    const handleMouseMove = useCallback((e: MouseEvent) => {
+    const handleMouseMove = useCallback((e: MouseEvent | TouchEvent) => {
         if (!isDragging || !knobRef.current) return;
         
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
         const rect = knobRef.current.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
-        const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+        const angle = Math.atan2(clientY - centerY, clientX - centerX) * (180 / Math.PI);
         
         let rotation = angle + 90; // Adjust to start from top
         if (rotation < -135) rotation = -135;
@@ -51,20 +53,23 @@ const Knob: React.FC<KnobProps> = ({ value, onChange, min = 0, max = 100, step =
     }, []);
 
     useEffect(() => {
+        const moveEvent = 'ontouchstart' in window ? 'touchmove' : 'mousemove';
+        const upEvent = 'ontouchstart' in window ? 'touchend' : 'mouseup';
+
         if (isDragging) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener(moveEvent, handleMouseMove as EventListener);
+            window.addEventListener(upEvent, handleMouseUp);
         } else {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener(moveEvent, handleMouseMove as EventListener);
+            window.removeEventListener(upEvent, handleMouseUp);
         }
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener(moveEvent, handleMouseMove as EventListener);
+            window.removeEventListener(upEvent, handleMouseUp);
         };
     }, [isDragging, handleMouseMove, handleMouseUp]);
 
-    const handleMouseDown = (e: React.MouseEvent) => {
+    const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
         e.preventDefault();
         setIsDragging(true);
     };
@@ -75,10 +80,11 @@ const Knob: React.FC<KnobProps> = ({ value, onChange, min = 0, max = 100, step =
         <div 
             ref={knobRef}
             onMouseDown={handleMouseDown}
-            className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center cursor-pointer select-none relative border-2 border-gray-900"
+            onTouchStart={handleMouseDown}
+            className="w-14 h-14 bg-gray-700 rounded-full flex items-center justify-center cursor-pointer select-none relative border-2 border-gray-900"
             style={{ transform: `rotate(${rotation}deg)`}}
         >
-            <div className="w-1 h-4 bg-gray-300 rounded-full absolute top-1"></div>
+            <div className="w-1 h-5 bg-gray-300 rounded-full absolute top-1"></div>
         </div>
     );
 };

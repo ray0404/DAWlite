@@ -24,7 +24,7 @@ const EQControlBlock: React.FC<{params: EQSettings, onChange: (newParams: EQSett
 
 // Compressor Effect UI Block
 const CompressorControlBlock: React.FC<{params: CompressorSettings, onChange: (newParams: CompressorSettings) => void}> = ({ params, onChange }) => (
-     <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-4 w-full">
+     <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4 w-full">
         <KnobControl label="Thresh" value={params.threshold} unit="db" onChange={(v) => onChange({...params, threshold: v})} min={-100} max={0} step={1} />
         <KnobControl label="Ratio" value={params.ratio} unit=":1" onChange={(v) => onChange({...params, ratio: v})} min={1} max={20} step={0.1} />
         <KnobControl label="Attack" value={params.attack} unit="s" onChange={(v) => onChange({...params, attack: v})} min={0} max={1} step={0.001} />
@@ -97,7 +97,7 @@ const ChannelStripDetail: React.FC<ChannelStripDetailProps> = ({ track, trackCol
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center" onClick={onClose}>
       <div 
-        className="bg-[var(--color-bg-surface-light)] w-full max-w-4xl rounded-xl shadow-2xl border border-[var(--color-border)] overflow-hidden flex flex-col max-h-[90vh]"
+        className="bg-[var(--color-bg-surface-light)] w-full h-full md:max-w-4xl md:h-auto md:rounded-xl shadow-2xl border border-[var(--color-border)] overflow-hidden flex flex-col md:max-h-[90vh]"
         style={{ borderTop: `6px solid ${trackColor}`}}
         onClick={(e) => e.stopPropagation()}
       >

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import ChannelStrip from './ChannelStrip';
 import TransportControls from './TransportControls';
@@ -72,6 +71,11 @@ const DAWContainer: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
   const prevPixelsPerSecondRef = useRef(INITIAL_PIXELS_PER_SECOND * zoomLevel);
+  const initialPinchStateRef = useRef<{ distance: number; zoom: number } | null>(null);
+  
+  // Refs for smooth zooming
+  const targetZoomLevelRef = useRef(1);
+  const zoomAnimationRef = useRef<number | null>(null);
 
   const pixelsPerSecond = INITIAL_PIXELS_PER_SECOND * zoomLevel;
 
@@ -134,13 +138,13 @@ const DAWContainer: React.FC = () => {
     if (save) await db.saveProject('currentProject', newProjectState);
   };
 
-  const getSelectedClip = () => {
+  const getSelectedClip = useCallback(() => {
     for (const track of projectState.tracks) {
       const selected = track.clips.find(c => c.isSelected);
       if (selected) return { clip: selected, trackId: track.id };
     }
     return null;
-  };
+  }, [projectState.tracks]);
   
   const stopAnimationLoop = useCallback(() => {
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
@@ -172,7 +176,7 @@ const DAWContainer: React.FC = () => {
 
   const handleReturnToZero = useCallback(() => {
       handleSeek(0);
-  }, []);
+  }, [handleSeek]);
 
   const animationLoop = useCallback(() => {
     if (!audioContext) return;
@@ -247,7 +251,6 @@ const DAWContainer: React.FC = () => {
   };
   const handleClipEditing = (e: MouseEvent | TouchEvent) => {
     if (!editingAction) return;
-    // FIX: Add a type guard to ensure we don't try to access properties that don't exist on all union types of EditingAction.
     if (editingAction.type === 'set-loop') return;
     e.preventDefault();
 
@@ -381,8 +384,38 @@ const DAWContainer: React.FC = () => {
     } catch (err) { console.error("Rendering failed: ", err); showToast('Export failed.', 'error'); } 
     finally { setIsExporting(false); }
   };
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev * 1.5, 32));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev / 1.5, 0.1));
+
+  const animateZoom = useCallback(() => {
+    setZoomLevel(currentZoom => {
+      if (Math.abs(targetZoomLevelRef.current - currentZoom) < 0.001) {
+        if (zoomAnimationRef.current) cancelAnimationFrame(zoomAnimationRef.current);
+        zoomAnimationRef.current = null;
+        return targetZoomLevelRef.current;
+      }
+      const newZoom = currentZoom + (targetZoomLevelRef.current - currentZoom) * 0.2; // Lerp
+      zoomAnimationRef.current = requestAnimationFrame(animateZoom);
+      return newZoom;
+    });
+  }, []);
+
+  const setTargetZoom = useCallback((newTarget: number) => {
+    targetZoomLevelRef.current = Math.max(0.1, Math.min(newTarget, 32));
+    if (!zoomAnimationRef.current) {
+        zoomAnimationRef.current = requestAnimationFrame(animateZoom);
+    }
+  }, [animateZoom]);
+  
+  const handleZoomIn = useCallback(() => setTargetZoom(targetZoomLevelRef.current * 1.5), [setTargetZoom]);
+  const handleZoomOut = useCallback(() => setTargetZoom(targetZoomLevelRef.current / 1.5), [setTargetZoom]);
+  const handleZoomChange = useCallback((newZoom: number) => setTargetZoom(newZoom), [setTargetZoom]);
+  
+  const handlePan = useCallback((direction: 'left' | 'right') => {
+    if (timelineContainerRef.current) {
+        const amount = direction === 'left' ? -100 : 100;
+        timelineContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  }, []);
+
   const handleNudge = (direction: 'left' | 'right') => {
     const amount = direction === 'left' ? -NUDGE_AMOUNT : NUDGE_AMOUNT;
     const selected = getSelectedClip();
@@ -396,12 +429,13 @@ const DAWContainer: React.FC = () => {
         handleSeek(Math.max(0, playheadPosition + amount));
     }
   };
-  const handleRulerInteraction = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleRulerInteraction = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const x = clientX - rect.left;
     const time = (x + timelineContainerRef.current!.scrollLeft) / pixelsPerSecond;
-    if (e.altKey) {
+    if ('altKey' in e && e.altKey) {
         setEditingAction({ type: 'set-loop', startTime: time });
     } else {
         handleSeek(time);
@@ -501,6 +535,40 @@ const DAWContainer: React.FC = () => {
 
     updateProjectState({ ...projectState, tracks: newTracks });
   };
+
+  const handleTimelineTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+        e.preventDefault();
+        const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        initialPinchStateRef.current = { distance: dist, zoom: zoomLevel };
+    }
+  };
+
+  const handleTimelineTouchMove = (e: React.TouchEvent) => {
+    // Pinch-to-zoom
+    if (e.touches.length === 2 && initialPinchStateRef.current) {
+        e.preventDefault();
+        const newDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        const newZoom = initialPinchStateRef.current.zoom * (newDist / initialPinchStateRef.current.distance);
+        handleZoomChange(newZoom);
+    } 
+    // Set loop region with touch
+    else if (editingAction?.type === 'set-loop' && e.touches.length === 1) {
+        const touch = e.touches[0];
+        const rect = timelineContainerRef.current!.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const time = (x + timelineContainerRef.current!.scrollLeft) / pixelsPerSecond;
+        const start = Math.min(editingAction.startTime, time);
+        const end = Math.max(editingAction.startTime, time);
+        updateProjectState({ ...projectState, loopRegion: { start, end } }, false);
+    }
+  };
+  
+  const handleTimelineTouchEnd = () => {
+    if (initialPinchStateRef.current) {
+        initialPinchStateRef.current = null;
+    }
+  };
   
   // UseEffects for global listeners and keyboard shortcuts
   useEffect(() => {
@@ -537,10 +605,14 @@ const DAWContainer: React.FC = () => {
         else if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'm') { e.preventDefault(); handleAddTrack('midi'); }
         else if (e.code === 'ArrowLeft' && e.altKey) { e.preventDefault(); handleNudge('left'); }
         else if (e.code === 'ArrowRight' && e.altKey) { e.preventDefault(); handleNudge('right'); }
+        else if (e.code === 'Equal' || e.code === 'NumpadAdd') { e.preventDefault(); handleZoomIn(); }
+        else if (e.code === 'Minus' || e.code === 'NumpadSubtract') { e.preventDefault(); handleZoomOut(); }
+        else if (e.code === 'ArrowLeft') { e.preventDefault(); handlePan('left'); }
+        else if (e.code === 'ArrowRight') { e.preventDefault(); handlePan('right'); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying, contextMenu, handleStop, handlePlay, handleReturnToZero, handleRecord, getSelectedClip]);
+  }, [isPlaying, contextMenu, getSelectedClip, handleStop, handlePlay, handleReturnToZero, handleRecord, handleZoomIn, handleZoomOut, handlePan]);
 
   if (!audioContext) return <div className="flex items-center justify-center h-screen">Loading audio engine...</div>;
 
@@ -560,11 +632,17 @@ const DAWContainer: React.FC = () => {
         onRecord={handleRecord} onReturnToZero={handleReturnToZero} currentTime={playheadPosition}
         isLooping={isLooping} onToggleLoop={() => setIsLooping(p => !p)}
         zoomLevel={zoomLevel} onZoomIn={handleZoomIn} onZoomOut={handleZoomOut}
+        onZoomChange={handleZoomChange}
+        onPanLeft={() => handlePan('left')} onPanRight={() => handlePan('right')}
         onNudgeLeft={() => handleNudge('left')} onNudgeRight={() => handleNudge('right')}
       />
       <input type="file" ref={fileInputRef} onChange={handleFileSelected} accept="audio/*" className="hidden" />
 
-      <div ref={timelineContainerRef} className="w-full overflow-auto bg-[var(--color-bg-surface)] flex-grow" onMouseMove={(e) => {
+      <div ref={timelineContainerRef} className="w-full overflow-auto bg-[var(--color-bg-surface)] flex-grow timeline-container" 
+        onTouchStart={handleTimelineTouchStart}
+        onTouchMove={handleTimelineTouchMove}
+        onTouchEnd={handleTimelineTouchEnd}
+        onMouseMove={(e) => {
           if (editingAction?.type === 'set-loop') {
               const rect = e.currentTarget.getBoundingClientRect();
               const x = e.clientX - rect.left;
@@ -576,13 +654,13 @@ const DAWContainer: React.FC = () => {
       }}>
         <div className="relative" style={{ width: `${timelineWidth}px`, minWidth: '100%' }}>
            <div className="h-8 flex items-stretch border-b-2 border-[var(--color-border)] sticky top-0 bg-[var(--color-bg-surface-light)] z-20">
-                <div className="w-64 flex-shrink-0 border-r-2 border-[var(--color-border)] flex items-center justify-between pr-2 sticky left-0 bg-[var(--color-bg-surface-light)] z-30">
+                <div className="w-48 md:w-64 flex-shrink-0 border-r-2 border-[var(--color-border)] flex items-center justify-between pr-2 sticky left-0 bg-[var(--color-bg-surface-light)] z-30">
                     <span className="text-sm font-bold pl-3 text-[var(--color-text-secondary)]">Tracks</span>
                     <button onClick={() => setIsSnapping(prev => !prev)} title="Toggle Snapping" className={`p-1 rounded ${isSnapping ? 'bg-[var(--color-accent-blue)] text-white' : 'text-gray-400 hover:bg-white/10'} transition-colors`}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 7v10a7 7 0 0 0 14 0V7"/><path d="M5 7h4"/><path d="M15 7h4"/></svg>
                     </button>
                 </div>
-                <div className="flex-grow relative h-full cursor-pointer" onMouseDown={handleRulerInteraction}>
+                <div className="flex-grow relative h-full cursor-pointer" onMouseDown={handleRulerInteraction} onTouchStart={handleRulerInteraction}>
                     {Array.from({ length: TOTAL_BARS * TIME_SIGNATURE_TOP }, (_, i) => (<div key={`beat-${i}`} className="absolute h-full" style={{ left: `${i * SECONDS_PER_BEAT * pixelsPerSecond}px` }}><div className={`w-px h-1 ${i % TIME_SIGNATURE_TOP === 0 ? 'bg-gray-500' : 'bg-gray-700'}`}></div></div>))}
                     {Array.from({ length: TOTAL_BARS + 1 }, (_, i) => (<div key={`bar-${i}`} className="absolute text-xs text-[var(--color-text-secondary)]" style={{ left: `${i * SECONDS_PER_BAR * pixelsPerSecond}px` }}><div className="h-2 w-px bg-gray-500"></div><span className="pl-1">{i + 1}</span></div>))}
                     {projectState.loopRegion && <div className="absolute top-0 h-full bg-blue-500/20" style={{ left: `${projectState.loopRegion.start * pixelsPerSecond}px`, width: `${(projectState.loopRegion.end - projectState.loopRegion.start) * pixelsPerSecond}px` }}></div>}

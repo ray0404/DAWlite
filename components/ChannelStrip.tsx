@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { AudioContextContext } from '../App';
 import { createCompressorNode } from '../services/dsp/CompressorNode';
@@ -117,7 +116,6 @@ const ChannelStrip: React.FC<ChannelStripProps> = (props) => {
 
   useEffect(() => {
     if(!audioContext || !pannerNodeRef.current) return;
-    // FIX: 'now' was not defined in this scope.
     const now = audioContext.currentTime;
     pannerNodeRef.current.pan.setTargetAtTime(track.pan, now, RAMP_TIME);
   }, [track.pan, audioContext]);
@@ -148,8 +146,8 @@ const ChannelStrip: React.FC<ChannelStripProps> = (props) => {
 
   return (
     <div className={`flex items-stretch border-b-2 bg-[var(--color-bg-surface)] min-h-[120px] ${isSelected ? 'outline-2 outline -outline-offset-2 outline-[var(--color-accent-blue)]' : 'border-[var(--color-border)]'}`}>
-        <div className="w-64 flex-shrink-0 bg-[var(--color-bg-surface-light)] p-2 flex border-r-2 border-[var(--color-border)] sticky left-0 z-10" style={{ borderLeft: `5px solid ${trackColor}`}}>
-            <div className="flex flex-col justify-between w-2/3 pr-2" onClick={() => onSelectClip('', track.id)}>
+        <div className="w-48 md:w-64 flex-shrink-0 bg-[var(--color-bg-surface-light)] p-2 flex flex-col md:flex-row border-r-2 border-[var(--color-border)] sticky left-0 z-10" style={{ borderLeft: `5px solid ${trackColor}`}}>
+            <div className="flex flex-col justify-between w-full md:w-2/3 pr-2" onClick={() => onSelectClip('', track.id)}>
                  <div>
                     <h3 className="text-sm font-semibold truncate text-white">{track.name}</h3>
                     <div className="flex items-center justify-between">
@@ -170,7 +168,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = (props) => {
                 </div>
                 <Knob value={track.pan} onChange={(v) => onTrackChange({ ...track, pan: v })} min={-1} max={1} step={0.01} />
             </div>
-             <div className="w-1/3 flex items-center justify-center px-2 space-x-2">
+             <div className="w-full md:w-1/3 flex items-center justify-center md:px-2 space-x-2 pt-2 md:pt-0">
                 <Fader value={track.volume} onChange={(v) => onTrackChange({ ...track, volume: v })} />
                 <Meter level={meterLevel} />
             </div>
