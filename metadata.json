@@ -1,0 +1,5 @@
+{
+  "name": "DAWlite",
+  "description": "A proof-of-concept for a Web-based Digital Audio Workstation (DAW) PWA, featuring a multi-track mixer, modular effects, and offline-first capabilities using the Web Audio API and IndexedDB.",
+  "requestFramePermissions": []
+}

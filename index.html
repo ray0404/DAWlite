@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a1b1e" />
+    <title>WebLogic - PWA DAW</title>
+    <link rel="manifest" href="manifest.json" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --color-bg-base: #262626;
+        --color-bg-surface: #313131;
+        --color-bg-surface-light: #3c3c3c;
+        --color-bg-transport: #424242;
+        --color-border: #1a1a1a;
+        --color-text-primary: #d1d5db;
+        --color-text-secondary: #9ca3af;
+        --color-accent-green: #29a147;
+        --color-accent-green-hover: #32c256;
+        --color-accent-red: #d84a4a;
+        --color-accent-yellow: #f5b945;
+        --color-accent-blue: #4a90e2;
+        --color-playhead: #f56565;
+        --scrollbar-thumb-bg: #555;
+        --scrollbar-track-bg: #333;
+      }
+
+      body {
+        background-color: var(--color-bg-base);
+        color: var(--color-text-primary);
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb-bg) var(--scrollbar-track-bg);
+      }
+      
+      /* Custom Scrollbar for Webkit browsers */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--scrollbar-track-bg);
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: var(--scrollbar-thumb-bg);
+        border-radius: 4px;
+        border: 2px solid var(--scrollbar-track-bg);
+      }
+      
+      /* Remove default range input styles */
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
